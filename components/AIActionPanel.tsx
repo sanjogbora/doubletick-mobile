@@ -1,0 +1,246 @@
+
+import React, { useState } from 'react';
+import { Sparkle, Clock, AlertCircle, FileText, ChevronDown, Info, Minus, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { AISuggestion, PriorityLevel, ActionType } from '../types';
+
+interface AIActionPanelProps {
+    suggestions: AISuggestion[];
+    onAccept: (id: string, action: ActionType, payload: any) => void;
+    onDismiss: (id: string) => void;
+    onEdit: (id: string) => void;
+    minimized?: boolean;
+    onToggleMinimize?: () => void;
+    className?: string;
+}
+
+const AIActionPanel: React.FC<AIActionPanelProps> = ({
+    suggestions,
+    onAccept,
+    onDismiss,
+    onEdit,
+    minimized = false,
+    onToggleMinimize,
+    className = ""
+}) => {
+    const [isExpanded, setIsExpanded] = useState(true);
+
+    if (suggestions.length === 0) return null;
+
+    // Sort by priority
+    const sortedSuggestions = [...suggestions].sort((a, b) => {
+        const priorityOrder = { [PriorityLevel.HIGH]: 3, [PriorityLevel.MEDIUM]: 2, [PriorityLevel.LOW]: 1 };
+        return priorityOrder[b.priority] - priorityOrder[a.priority];
+    });
+
+    if (minimized) {
+        return (
+            <div
+                className={`flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-purple-100 rounded-full px-3 py-1.5 cursor-pointer shadow-lg ${className}`}
+                onClick={onToggleMinimize}
+            >
+                <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
+                    <Sparkle size={14} />
+                </div>
+                <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold ml-1">
+                    {suggestions.length}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`bg-white/95 backdrop-blur-md border border-indigo-100 shadow-xl rounded-t-2xl overflow-hidden transition-all duration-300 ${className}`}>
+            {/* Header / Toggle */}
+            <div className="flex items-center justify-between p-3 cursor-pointer bg-indigo-50/50 border-b border-indigo-100" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex items-center gap-2 text-indigo-900">
+                    <div className="p-1.5 bg-white rounded-full shadow-sm border border-indigo-100 relative">
+                        <Sparkle size={14} className="text-indigo-600" />
+                    </div>
+                    <span className="text-sm font-bold">Converso</span>
+                    <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-medium border border-indigo-200">
+                        {suggestions.length} suggested
+                    </span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onToggleMinimize?.(); }}
+                        className="p-2 text-indigo-300 hover:text-indigo-500 hover:bg-indigo-100 rounded-full transition-colors"
+                    >
+                        <Minus size={16} />
+                    </button>
+                    <button className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors">
+                        <ChevronDown size={18} className={`transform transition-transform ${isExpanded ? '' : 'rotate-180'}`} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Suggestions Grid */}
+            {isExpanded && (
+                <div className="flex flex-col gap-0 divide-y divide-indigo-50 max-h-[250px] overflow-y-auto scrollbar-hide">
+                    {sortedSuggestions.map((suggestion) => (
+                        <SuggestionCard
+                            key={suggestion.id}
+                            suggestion={suggestion}
+                            onAccept={onAccept}
+                            onDismiss={onDismiss}
+                            onEdit={onEdit}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const SuggestionCard: React.FC<{
+    suggestion: AISuggestion,
+    onAccept: any,
+    onDismiss: any,
+    onEdit: any
+}> = ({ suggestion, onAccept, onDismiss, onEdit }) => {
+
+    const [showReasoning, setShowReasoning] = useState(false);
+    const [completedState, setCompletedState] = useState(false);
+
+    const getIcon = (type: ActionType) => {
+        switch (type) {
+            case ActionType.SCHEDULE_FOLLOWUP: return <Clock size={18} />;
+            case ActionType.SEND_TEMPLATE: return <FileText size={18} />;
+            case ActionType.ESCALATE: return <AlertCircle size={18} />;
+            default: return <Sparkle size={18} />;
+        }
+    };
+
+    const handleAccept = () => {
+        onAccept(suggestion.id, suggestion.actionType, suggestion.payload);
+        if (suggestion.actionType === ActionType.SEND_TEMPLATE) {
+            setCompletedState(true);
+        }
+    };
+
+    if (completedState) {
+        return (
+            <div className="p-4 bg-green-50 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-2 text-green-800">
+                    <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                    <span className="text-sm font-medium">Action completed</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="flex gap-1">
+                        <button className="p-1 hover:bg-green-100 rounded text-green-700 transition-colors"><ThumbsUp size={14} /></button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div
+            className={`p-2 active:bg-gray-50 transition-colors relative group ${suggestion.priority === PriorityLevel.HIGH ? 'bg-red-50/30' : 'bg-white/50'}`}
+        >
+            {/* High Priority Marker */}
+            {suggestion.priority === PriorityLevel.HIGH && (
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div>
+            )}
+
+            <div className="flex gap-2.5 items-start">
+                {/* Icon Box */}
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm border mt-0.5 ${suggestion.priority === PriorityLevel.HIGH ? 'bg-red-100 border-red-200 text-red-600' : 'bg-white border-indigo-100 text-indigo-600'}`}>
+                    {getIcon(suggestion.actionType)}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-gray-900 truncate">{suggestion.title}</h4>
+                            <PriorityPill priority={suggestion.priority} />
+                        </div>
+                        {/* Confidence Score */}
+                        <div className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded-full border mr-1 ${suggestion.confidence >= 85 ? 'bg-green-50 border-green-200 text-green-700' :
+                            suggestion.confidence >= 70 ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
+                                'bg-orange-50 border-orange-200 text-orange-700'
+                            }`} title={`AI Confidence: ${suggestion.confidence}%`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${suggestion.confidence >= 85 ? 'bg-green-500' :
+                                suggestion.confidence >= 70 ? 'bg-yellow-500' :
+                                    'bg-orange-500'
+                                }`}></div>
+                            <span className="text-[10px] font-bold">{suggestion.confidence}%</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1 mt-0.5">
+                        <p className="text-xs text-gray-700 leading-snug" title={suggestion.description}>{suggestion.description}</p>
+
+                        {/* Inline Actions & Logic Toggle */}
+                        <div className="flex items-center justify-between mt-1">
+                            <button
+                                onClick={() => setShowReasoning(!showReasoning)}
+                                className="flex items-center gap-1 text-[10px] font-medium text-indigo-400 hover:text-indigo-600 transition-colors"
+                            >
+                                <Info size={10} />
+                                {showReasoning ? 'Hide' : 'Why this?'}
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => onDismiss(suggestion.id)}
+                                    className="text-xs text-gray-400 hover:text-gray-600 px-3 py-2 rounded hover:bg-gray-100 transition-all min-h-[40px]"
+                                >
+                                    Dismiss
+                                </button>
+                                <button
+                                    onClick={handleAccept}
+                                    className={`text-xs font-bold px-4 py-2 rounded-lg shadow-sm flex items-center gap-1 transition-all active:scale-95 min-h-[40px] ${suggestion.actionType === ActionType.SCHEDULE_FOLLOWUP
+                                        ? 'bg-indigo-600 text-white shadow-indigo-200'
+                                        : 'bg-emerald-600 text-white shadow-emerald-200'
+                                        }`}
+                                >
+                                    {suggestion.actionType === ActionType.SCHEDULE_FOLLOWUP ? 'Review' : 'Send'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Reasoning Drawer */}
+                    {showReasoning && suggestion.reasoning && (
+                        <div className="mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100 text-xs text-slate-600 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex gap-2 items-start">
+                                <span className="font-semibold text-slate-800 w-12 shrink-0">Trigger:</span>
+                                <div className="flex-1">
+                                    <span className="font-mono bg-yellow-50 text-yellow-800 px-1 py-0.5 rounded border border-yellow-100">{suggestion.reasoning.trigger}</span>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 items-start">
+                                <span className="font-semibold text-slate-800 w-12 shrink-0">Intent:</span>
+                                <div className="flex-1">
+                                    <span className="text-indigo-600 font-bold bg-indigo-50 px-1 py-0.5 rounded">{suggestion.reasoning.intent}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const CheckCircleIcon = (props: any) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+)
+
+const PriorityPill: React.FC<{ priority: PriorityLevel }> = ({ priority }) => {
+    const styles = {
+        [PriorityLevel.HIGH]: 'bg-red-100 text-red-700 border-red-200',
+        [PriorityLevel.MEDIUM]: 'bg-orange-100 text-orange-700 border-orange-200',
+        [PriorityLevel.LOW]: 'bg-slate-100 text-slate-600 border-slate-200'
+    };
+
+    return (
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wide ${styles[priority]}`}>
+            {priority}
+        </span>
+    );
+};
+
+export default AIActionPanel;

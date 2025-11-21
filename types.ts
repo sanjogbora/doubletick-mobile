@@ -1,51 +1,85 @@
-export type Priority = 'high' | 'medium' | 'low';
-export type Confidence = 'high' | 'medium' | 'low';
-export type ActionType = 'schedule_call' | 'send_document' | 'follow_up' | 'reply_template';
 
-export interface User {
-  id: string;
-  name: string;
-  avatar: string;
-  role: string;
+export enum MessageType {
+  TEXT = 'text',
+  IMAGE = 'image',
+  PDF = 'pdf',
+  SCHEDULE = 'schedule'
 }
 
-export interface Customer {
-  id: string;
-  name: string;
-  phone: string;
-  avatar: string; // Using placeholder URLs
-  company?: string;
-  tags: string[];
+export enum MessageSender {
+  USER = 'user', // The agent
+  CONTACT = 'contact', // The customer
+  SYSTEM = 'system'
 }
 
 export interface Message {
   id: string;
-  text: string;
-  sender: 'agent' | 'customer' | 'system';
+  content: string;
+  sender: MessageSender;
   timestamp: string;
-  isRead: boolean;
+  type: MessageType;
+  isRead?: boolean;
+  payload?: any; // For structured messages like schedule details
+}
+
+export enum LeadStage {
+  NEW = 'New Lead',
+  HOT = 'Hot',
+  WARM = 'Warm',
+  COLD = 'Cold',
+  CLOSED_WON = 'Closed Won',
+  CLOSED_LOST = 'Closed Lost'
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  avatar?: string;
+  email?: string;
+  leadStage: LeadStage;
+  tags: string[];
+  notes: string;
+  lastActive: string;
+  source: string;
+}
+
+export interface Chat {
+  id: string;
+  contact: Contact;
+  messages: Message[];
+  unreadCount: number;
+  pinned: boolean;
+}
+
+// AI Specific Types
+export enum PriorityLevel {
+  HIGH = 'High',
+  MEDIUM = 'Medium',
+  LOW = 'Low'
+}
+
+export enum ActionType {
+  SCHEDULE_FOLLOWUP = 'schedule_followup',
+  SEND_TEMPLATE = 'send_template',
+  UPDATE_FIELD = 'update_field',
+  ESCALATE = 'escalate'
+}
+
+export interface AIReasoning {
+  trigger: string; // The text that triggered this
+  intent: string; // The classified intent
+  entities: string[]; // Extracted data points
 }
 
 export interface AISuggestion {
   id: string;
-  chatId: string;
-  type: ActionType;
+  actionType: ActionType;
   title: string;
-  description: string; // The rationale
-  suggestedActionPayload?: string; // e.g., "Tomorrow 4pm" or "Catalog.pdf"
-  confidence: Confidence;
-  priority: Priority;
-  reason: string; // Explainability text
-  status: 'pending' | 'accepted' | 'rejected' | 'scheduled';
-  createdAt: string;
-}
-
-export interface ChatThread {
-  id: string;
-  customer: Customer;
-  messages: Message[];
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  suggestions: AISuggestion[]; // Active suggestions for this thread
+  description: string;
+  reasoning: AIReasoning; // Detailed explanation
+  confidence: number; // 0 to 100
+  priority: PriorityLevel;
+  payload?: any; // Data needed to execute (e.g., template ID, date)
+  isHidden?: boolean;
 }
